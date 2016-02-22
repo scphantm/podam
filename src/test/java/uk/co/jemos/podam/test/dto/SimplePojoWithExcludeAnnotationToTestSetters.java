@@ -15,11 +15,15 @@ import java.lang.annotation.Target;
  */
 public class SimplePojoWithExcludeAnnotationToTestSetters extends SimplePojoToTestSetters {
 
+	private static final long serialVersionUID = 1L;
+
 	@TestExclude
 	private Object excludeField1;
 	
 	private Object excludeField2;
-	
+
+	private Boolean excludeField3;
+
 	/**
 	 * No args-constructor
 	 */
@@ -55,9 +59,24 @@ public class SimplePojoWithExcludeAnnotationToTestSetters extends SimplePojoToTe
 		this.excludeField2 = excludeField2;
 	}
 
+	/**
+	 * @return the excludeField3
+	 */
+	@TestExclude
+	public Boolean isExcludeField3() {
+		return excludeField3;
+	}
+
+	/**
+	 * @param excludeField3 the excludeField3 to set
+	 */
+	public void setExcludeField3(Boolean excludeField3) {
+		this.excludeField3 = excludeField3;
+	}
+
 	@Target(value = {ElementType.FIELD, ElementType.METHOD})
 	@Retention(RetentionPolicy.RUNTIME)
-	public static @interface TestExclude {
+	public @interface TestExclude {
 		
 	}
 }

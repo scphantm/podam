@@ -44,12 +44,4 @@ public class PodamTestUtils {
 		return myBirthday;
 	}
 
-	// ------------------->> Getters / Setters
-
-	// ------------------->> Private methods
-
-	// ------------------->> equals() / hashcode() / toString()
-
-	// ------------------->> Inner classes
-
 }

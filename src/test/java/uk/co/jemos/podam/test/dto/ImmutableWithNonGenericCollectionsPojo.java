@@ -9,8 +9,8 @@ import java.util.Map;
 import java.util.Set;
 
 import net.jcip.annotations.Immutable;
-import uk.co.jemos.podam.annotations.PodamCollection;
-import uk.co.jemos.podam.annotations.PodamConstructor;
+import uk.co.jemos.podam.common.PodamCollection;
+import uk.co.jemos.podam.common.PodamConstructor;
 
 /**
  * @author mtedone
@@ -35,6 +35,7 @@ public class ImmutableWithNonGenericCollectionsPojo implements Serializable {
 	// This is actually intentional
 	private final Map nonGenerifiedMap;
 
+	@SuppressWarnings("rawtypes")
 	private final Set nonGenerifiedSet;
 
 	// ------------------->> Constructors
@@ -85,6 +86,7 @@ public class ImmutableWithNonGenericCollectionsPojo implements Serializable {
 	/**
 	 * @return the nonGenerifiedSet
 	 */
+	@SuppressWarnings("rawtypes")
 	public Set getNonGenerifiedSet() {
 		return nonGenerifiedSet;
 	}

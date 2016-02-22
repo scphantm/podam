@@ -4,7 +4,30 @@
 	Marco Tedone
 	---------------------
 
-Introduction  
+Introduction
+
+  PODAM is a lightweight tool to auto-fill Java POJOs with data. This comes handy when developing unit tests. Thanks
+  to PODAM users now have a one-liner that does all the work them.
+
+* PODAM main features:
+
+  * Automatic introspection of your POJOs to fill all possible attributes with random data. You can customise this behaviour.
+
+  * Extension points to customise the data strategy, fields exclusions based on names or annotations
+
+  * Support for your custom annotations to either provide data or exclude fields
+
+  * The option to select minimal constructors (for lightweight POJOs) or full constructors
+
+  * Support for Java types, enumerations, arrays, collections (lists, sets, maps)
+
+  * Support for generics
+
+  * Support for your own factories when PODAM cannot introspect enough information to generate a
+  type (e.g. XMLGregorianCalendar)
+
+  * Support for arbitrary method executions when the normal lifecycle has ended
+
 
 * Using PODAM in your project
 
@@ -14,8 +37,21 @@ Introduction
 * How to use PODAM API        
   
 +-----------------------------------
-PodamFactory factory = new PodamFactoryImpl(); //This will use the default Random Data Provider Strategy
+// Simplest scenario. Will delegate to Podam all decisions
+PodamFactory factory = new PodamFactoryImpl();
+
+// This will use constructor with minimum arguments and
+// then setters to populate POJO
 Pojo myPojo = factory.manufacturePojo(Pojo.class);
+
+// This will use constructor with maximum arguments and
+// then setters to populate POJO
+Pojo myPojo2 = factory.manufacturePojoWithFullData(Pojo.class);
+
+// If object instance is already available,
+// Podam can fill it with random data
+Pojo myPojo3 = MyFactory.getPojoInstance();
+factory.populatePojo(myPojo3);
 +-----------------------------------
 
   PODAM allows users to customise the way data are assigned in several ways: 
@@ -28,7 +64,9 @@ Pojo myPojo = factory.manufacturePojo(Pojo.class);
   
   * For strings by customising the string value and length through annotation
   
-  * To skip a certain attribute by using the <@PodamExclude> annotation
+  * To skip a certain attribute by using the <@PodamExclude> annotation or by name
+
+  * By defining a collection of methods that Podam should execute while filling POJOs
   
 ** Defining a global data provider strategy
 
@@ -42,12 +80,14 @@ PodamFactory factory = new PodamFactoryImpl(strategy);
 
 Pojo myPojo = factory.manufacturePojo(Pojo.class);
 
+Pojo myPojo2 = factory.manufacturePojoWithFullData(Pojo.class);
+
 +-----------------------------------
 
   Please note that annotations are not required to use PODAM. The tool will automatically introspect
   and fill your tree of POJOs out-of-the-box. The preferred way to customise the way PODAM fills your data
   is through a custom <DataProviderStrategy>, as shown above. However one can annotate Java classes to 
-  provide custom values, as shown below.
+  provide custom values, as shown below. Podam also supports your own annotations.
 
 ** Defining an attribute-level strategy
 
@@ -58,7 +98,9 @@ Pojo myPojo = factory.manufacturePojo(Pojo.class);
   * Provide an implementation of the <<AttributeStrategy\<T\>>> interface
   
   * Use the <<@PodamStrategyValue>> annotation
-  
+
+  []
+
   Example: 
   
 +-----------------------------------
@@ -76,7 +118,9 @@ private Calendar myBirthday;
   * PostCodeStrategy to create a UK-like postcode
   
   * MyBirthdayStrategy to create a Calendar which contains the exact time of my birth
-  
+
+  []
+
   The <PostCodeStrategy> class looks like the following:
   
 +-----------------------------------
@@ -209,6 +253,83 @@ private double doubleFieldWithMinAndMaxValue;
   To know more about how PODAM works, please refer to the {{{./walk-through-example.html} The walk-through example}} page 
   or to the {{{./corner-cases.html} Corner Cases }} page on the left menu.
 
+** A simple example to manufacture collections
+
+  You can use PODAM to fill in generic collections with dummy data. 
+
++-----------------------------------
+PodamFactory podam = new PodamFactoryImpl();
+
+// Annotation required to remove warning because of type erasure although it would work without
+@SuppressWarnings("unchecked")
+List<String> list = podam.manufacturePojo(ArrayList.class, String.class);
+
++-----------------------------------  
+
+** Defining an attribute-level strategy with <DataProviderStrategy>
+
+  Assuming we are filling the class
+
++-----------------------------------
+public static class Pojo {
+	private String randomString;
+	private String postCode;
+	private URL url;
+
+	public String getRandomString() { return randomString; }
+
+	public void setRandomString(String randomString) { this.randomString = randomString; }
+
+	public String getUrl() { return url.toString(); }
+
+	public void setUrl(String url) throws MalformedURLException { this.url = new URL(url); }
+
+	public String getPostCode() { return postCode; }
+
+	public void setPostCode(String postCode) { this.postCode = postCode; }
+}
++-----------------------------------
+
+  Define custom <DataProviderStrategy>, which will be producing values
+  depending on attribute type
+
++-----------------------------------
+public class CustomProviderStrategy extends AbstractRandomDataProviderStrategy {
+
+	@Override
+	public String getStringValue(AttributeMetadata attributeMetadata) {
+
+		if (Pojo.class.isAssignableFrom(attributeMetadata.getPojoClass())) {
+
+			if ("url".equals(attributeMetadata.getAttributeName())) {
+				return "http://wikipedia.org";
+			} else if ("postCode".equals(attributeMetadata.getAttributeName())) {
+				return "00100";
+			}
+		}
+		return super.getStringValue(attributeMetadata);
+	}
+}
++-----------------------------------
+
+  Intantiate POJO with <PodamFactory>
+
++-----------------------------------
+CustomProviderStrategy providerStrategy = new CustomProviderStrategy();
+PodamFactory factory = new PodamFactoryImpl(providerStrategy);
+Pojo pojo = factory.manufacturePojo(Pojo.class);
++-----------------------------------
+
+  Result:
+
++-----------------------------------
+{
+  "randomString":"rP_yOK2EtR",
+  "postCode":"00100",
+  "url":"http://wikipedia.org"
+}
++-----------------------------------
+
 ** Manufacturing generic types
 
   Sometimes you may want to manufacture a generic type directly without a wrapper class or a subclass.
@@ -321,107 +442,50 @@ GenericPojo [
 ]
 +-----------------------------------
 
-** Using PODAM with Spring
 
-  You can also use PODAM with Spring: 
-  
-  * Define the Data Provider Strategy as a bean if you don't want the default (Random data)
-  
-  * Define PodamFactory bean, initialised with the Data Provider Strategy
-  
-  * Use the PodamFactory bean in your code
-  
-  []
-  
-+-----------------------------------
+** Tweaking PODAM for performance
 
-# Define your Spring app context
-
-<?xml version="1.0" encoding="UTF-8"?>
-<beans xmlns="http://www.springframework.org/schema/beans"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
-
-
-	<!-- The definition of the default strategy -->
-	<bean id="myDataProviderStrategy"
-		class="uk.co.jemos.podam.api.MyDataProviderStrategy"
-		factory-method="getInstance" />
-		
-	<!-- The definition of PODAM factory -->
-	<bean id="podamFactory" class="uk.co.jemos.podam.api.PodamFactoryImpl">
-	  <constructor-arg index="0" ref="myDataProviderStrategy" />
-	</bean>
-
-</beans>
-+-----------------------------------
+  Building huge graphs of nested objects may take time. Podam has a memoization option which is the default.
+  When enabled, Podam will only create a unique object for each class and reuse it.
+  This reduces algorithmic complexity in scenarios where distinct random data is not needed.
+  To disable memoization, you can do the following:
 
 +-----------------------------------
+PodamFactory podam = new PodamFactoryImpl();
+podam.getStrategy().setMemoizationEnabled(false);
++-----------------------------------
 
-# Use Podam Factory in your code
+** Executing arbitrary methods after POJO instantiation
 
-/**
- * 
- */
-package uk.co.jemos.podam.test.unit.integration;
+  Class info strategy can be instructed to execute arbitrary methods after POJO creation and hydation.
 
-import javax.annotation.Resource;
+  For example, the class
 
-import junit.framework.Assert;
++-----------------------------------
+public class MyPojo {
 
-import org.junit.Before;
-import org.junit.Test;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.AbstractJUnit4SpringContextTests;
+    private String strValue;
+    private Integer intValue;
 
-import uk.co.jemos.podam.api.PodamFactory;
-import uk.co.jemos.podam.test.dto.SimplePojoToTestSetters;
-
-/**
- * @author mtedone
- * 
- */
-@ContextConfiguration(locations = {"classpath:podam-test-appContext.xml"})
-public class PodamFactoryInjectionIntegrationTest
-		extends	AbstractJUnit4SpringContextTests {
-	
-	/** The Podam Factory */
-	@Resource
-	private PodamFactory factory;
-	
-	@Before
-	public void init() {
-		Assert.assertNotNull("The PODAM factory cannot be null!", factory);
-		Assert.assertNotNull("The factory strategy cannot be null!",
-				factory.getStrategy());
-	}
-
-	@Test
-	public void testSimplePojo() {
-
-		SimplePojoToTestSetters pojo = factory
-				.manufacturePojo(SimplePojoToTestSetters.class);
-		Assert.assertNotNull("The pojo cannot be null!", pojo);
-
-		...etc
-	}
+    public void init(String strValue, Integer intValue) {
+        this.strValue = strValue;
+        this.intValue = intValue;
+    }
 }
 +-----------------------------------
 
+  One needs to specify POJO class, method name and list of method parameter types.
 
-  Please note that the data provider strategy cannot be changed upon instantiation. If you want to use a different data provider
-  strategy, you'll need to create a new instance of PodamFactory. This has been decided to preserve thread-safety and immutability
-  of PodamFactory.  
-  
-* How PODAM assigns values
-  
-  By default PODAM assigns random values to all its types. However, PODAM can be extended by providing a custom implementation
-  of the <uk.co.jemos.podam.api.DataProviderStrategy> interface. 
-  Please note that methods which return a numeric value between ranges should consider the ranges inclusive, as documented
-  in the interface Javadoc. 
-  
-  PODAM uses the <uk.co.jemos.podam.api.RandomDataProviderStrategy> class as default Data Provider implementation.
-  
-  To know more about how PODAM works, please refer to the {{{./walk-through-example.html} The walk-through example}} page 
-  or to the {{{./corner-cases.html} Corner Cases }} page on the left menu.  
-    
++-----------------------------------
+DefaultClassInfoStrategy classInfoStrategy = DefaultClassInfoStrategy.getInstance();
+classInfoStrategy.addExtraMethod(MyPojo.class, "init", String.class, Integer.class);
++-----------------------------------
+
+  Then instantiation will look like:
+
++-----------------------------------
+PodamFactory podam = new PodamFactoryImpl();
+Pojo myPojo = factory.manufacturePojo(Pojo.class);
++-----------------------------------
+
+  PODAM will use values provided by <DataProviderStrategy> as parameters to call the methods.
